@@ -199,8 +199,8 @@ message DagCall {
   // specified, this will default to the NORMAL mode.
   ConsistencyType consistency = 4;
 
-  // The output_key at which the result of this DAG should be stored.
-  string output_key = 5;
+  // The output_keys at which the result of this DAG should be stored.
+  map<string, string> output_keys = 5;
 
   // A logical unique ID associated with the requesting client. This can
   // persist across requests and is used for causal metadata.
@@ -274,9 +274,9 @@ message DagSchedule {
   // results; if this field is empty, the result is put into the KVS.
   string response_address = 8;
 
-  // The output key at which the result of this DAG will be stored upon
+  // The output keys at which the result of this DAG will be stored upon
   // completion.
-  string output_key = 9;
+  map<string, string> output_keys = 9;
 
   // A logical unique ID associated with the requesting client. This can
   // persist across requests and is used for causal metadata.
