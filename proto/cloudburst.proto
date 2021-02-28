@@ -314,4 +314,17 @@ message DagTrigger {
   // The list of causal dependencies that have been accumulated until this
   // point in this DAG execution.
   repeated KeyVersion dependencies = 6;
+
+  //
+  repeated Write write_set = 7;
+}
+
+// A write made during function execution to be added to the write_set of a DAG
+message Write {
+    // Key to be written
+    string key = 1;
+
+    // Value to be written in that key
+    bytes value = 2;
+
 }
