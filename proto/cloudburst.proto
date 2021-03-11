@@ -315,8 +315,13 @@ message DagTrigger {
   // point in this DAG execution.
   repeated KeyVersion dependencies = 6;
 
-  //
+  // function writeset for writting in the end
   repeated Write write_set = 7;
+
+  // Debugging information for the time spent reading and obtaining references
+  double current_spent_read_time = 8;
+
+  double new_spent_read_time = 9;
 }
 
 // A write made during function execution to be added to the write_set of a DAG
