@@ -15,6 +15,7 @@
 syntax = "proto3";
 
 import "shared.proto";
+import "google/protobuf/timestamp.proto";
 
 // An enum to differentiate between different KVS requests.
 enum RequestType {
@@ -28,7 +29,7 @@ enum RequestType {
   PUT = 2;
 }
 
-enum LatticeType { 
+enum LatticeType {
   // No lattice type specified
   NONE = 0;
 
@@ -49,6 +50,9 @@ enum LatticeType {
 
   // Priority lattice
   PRIORITY = 6;
+
+  // Snapshot isolation lattice
+  SNAPSHOT_ISOLATION = 7;
 }
 
 enum AnnaError {
@@ -113,6 +117,9 @@ message KeyRequest {
 
   // A client-specific ID used to match asynchronous requests with responses.
   string request_id = 4;
+
+  // Snapshot from which to read
+  uint64 snapshot = 5;
 }
 
 // A response to a KeyRequest. 
@@ -133,6 +140,9 @@ message KeyResponse {
   // captured in the corresponding KeyTuple. This will only be set if the whole
   // request times out.
   AnnaError error = 4;
+
+  // Snapshot from which we read
+   uint64 snapshot = 5;
 }
 
 // A request to the routing tier to retrieve server addresses corresponding to
@@ -209,9 +219,18 @@ message MultiKeyCausalValue {
   // The mapping from keys to vector clocks for each of the direct causal
   // dependencies this key has.
   repeated KeyVersion dependencies = 2;
-  
+
   // The set of potentially causally concurrent values for this key.
   repeated bytes values = 3;
+}
+
+// An individual Snapshot Isolation lattice with snapshot timestamp
+message SnapshotIsolationValue {
+  // The snapshot associated with this particular key version.
+  uint64 snapshot = 1;
+
+  // Value for this key. We will always only have one value as SI does not allow concurrent writes.
+  bytes values = 2;
 }
 
 // Serialization of lowest-priority-wins lattices.
