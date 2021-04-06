@@ -19,35 +19,10 @@
 #include <google/protobuf/util/time_util.h>
 #include <iostream>
 const time_t minSITimeStamp = 0;
-template <typename T>
-struct SnapshotIsolationVersion {
-    time_t snapshot;
-    T value;
 
-    SnapshotIsolationVersion<T>(){
-        snapshot = minSITimeStamp;
-        value = T();
-    }
-
-    // need this because of static cast
-    SnapshotIsolationVersion<T>(unsigned) {
-        snapshot = minSITimeStamp;
-        value = T();
-    }
-
-    SnapshotIsolationVersion<T>(time_t timestamp, T v) {
-        snapshot = timestamp;
-        value = v;
-    }
-
-    unsigned size() {
-        return sizeof(time_t) + value.size();
-    }
-};
 template <typename T>
 struct SnapshotIsolationPayload {
     time_t snapshot;
-    std::map<time_t, SnapshotIsolationVersion<T>, std::greater<time_t>> previous_versions;
     T value;
 
     SnapshotIsolationPayload<T>() {
@@ -61,28 +36,13 @@ struct SnapshotIsolationPayload {
       value = T();
   }
 
-    SnapshotIsolationPayload<T>(time_t timestamp, T v,
-                                        std::map<time_t, SnapshotIsolationVersion<T>> prev_vers) {
-        snapshot = timestamp;
-        previous_versions = prev_vers;
-        value = v;
-    }
-
-    // For versions only
     SnapshotIsolationPayload<T>(time_t timestamp, T v) {
         snapshot = timestamp;
         value = v;
     }
 
   unsigned size() {
-    int size_of_map = 0;
-    if(previous_versions.size() != 0){
-        for(auto element : previous_versions){
-            size_of_map = previous_versions.size() * element.second.size();
-            break;
-        }
-    }
-    return sizeof(time_t) + value.size() + sizeof(std::map<time_t, SnapshotIsolationVersion<T>>) + size_of_map;
+    return sizeof(time_t) + value.size();
   }
 };
 
@@ -91,28 +51,9 @@ class SnapshotIsolationLattice : public Lattice<SnapshotIsolationPayload<T>> {
  protected:
   void do_merge(const SnapshotIsolationPayload<T> &p) {
         // Current version is more recent
-        if (this->element.snapshot >= p.snapshot){
-            if (p.snapshot != minSITimeStamp){
-                for (auto const& version: p.previous_versions){
-                    // We assume no two versions of the same object can have the same timestamp
-                    this->element.previous_versions[version.first] = version.second;
-                }
-                SnapshotIsolationVersion<T> copy(p.snapshot, p.value);
-                this->element.previous_versions[p.snapshot] = copy;
-            }
-        }
-        else{ // We got a newer version. Insert ourselves in the older versions and update values
-            // We dont want to add versions which are the "base" lattice
-            if(this->element.snapshot != minSITimeStamp){
-                SnapshotIsolationVersion<T> copy(this->element.snapshot, this->element.value);
-                this->element.previous_versions[this->element.snapshot] = copy;
-            }
+        if (this->element.snapshot > p.snapshot){
             this->element.snapshot = p.snapshot;
             this->element.value = p.value;
-            for (auto const& version: p.previous_versions){
-                // We assume no two versions of the same object can have the same timestamp
-                this->element.previous_versions[version.first] = version.second;
-            }
         }
   }
 
@@ -122,6 +63,89 @@ class SnapshotIsolationLattice : public Lattice<SnapshotIsolationPayload<T>> {
     SnapshotIsolationLattice(const SnapshotIsolationPayload<T> &p) :
       Lattice<SnapshotIsolationPayload<T>>(p) {}
   MaxLattice<unsigned> size() { return {this->element.size()}; }
+};
+
+template <typename K, typename V>
+class MapSILattice : public Lattice<std::map<K, V, std::greater<K>>> {
+protected:
+    void insert_pair(const K &k, const V &v) {
+        auto search = this->element.find(k);
+        if (search != this->element.end()) {
+            static_cast<V *>(&(search->second))->merge(v);
+        } else {
+            // need to copy v since we will be "growing" it within the lattice
+            V new_v = v;
+            this->element.emplace(k, new_v);
+        }
+    }
+
+    void do_merge(const std::map<K, V, std::greater<K>> &m) {
+        for (const auto &pair : m) {
+            this->insert_pair(pair.first, pair.second);
+        }
+    }
+
+public:
+    MapSILattice() : Lattice<std::map<K, V, std::greater<K>>>(std::map<K, V, std::greater<K>>()) {}
+    MapSILattice(const std::map<K, V, std::greater<K>> &m) : Lattice<std::map<K, V, std::greater<K>>>(m) {}
+    MaxLattice<unsigned> size() const { return this->element.size(); }
+
+    MapSILattice<K, V> intersect(MapSILattice<K, V> other) const {
+        MapSILattice<K, V> res;
+        map<K, V> m = other.reveal();
+
+        for (const auto &pair : m) {
+            if (this->contains(pair.first).reveal()) {
+                res.insert_pair(pair.first, this->at(pair.first));
+                res.insert_pair(pair.first, pair.second);
+            }
+        }
+
+        return res;
+    }
+
+    MapSILattice<K, V> project(bool (*f)(V)) const {
+        map<K, V> res;
+        for (const auto &pair : this->element) {
+            if (f(pair.second)) res.emplace(pair.first, pair.second);
+        }
+        return MapSILattice<K, V>(res);
+    }
+
+    BoolLattice contains(K k) const {
+        auto it = this->element.find(k);
+        if (it == this->element.end())
+            return BoolLattice(false);
+        else
+            return BoolLattice(true);
+    }
+
+    SetLattice<K> key_set() const {
+        set<K> res;
+        for (const auto &pair : this->element) {
+            res.insert(pair.first);
+        }
+        return SetLattice<K>(res);
+    }
+
+    V &at(K k) { return this->element[k]; }
+
+    bool has_upper_bound(K k) {
+        auto it = this->element.upper_bound(k);
+        return it != this->element.end();
+    }
+
+    V &upper_bound(K k) {
+        auto it = this->element.upper_bound(k);
+        return this->element.at(it->first);
+    }
+
+    void remove(K k) {
+        auto it = this->element.find(k);
+        if (it != this->element.end()) this->element.erase(k);
+    }
+
+    void insert(const K &k, const V &v) { this->insert_pair(k, v); }
 };
 
 

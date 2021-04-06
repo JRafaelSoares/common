@@ -192,10 +192,10 @@ inline string serialize(const MultiKeyCausalLattice<SetLattice<string>>& l) {
 }
 
 // We get a payload here because the lattice holds the many versions
-inline string serialize(const SnapshotIsolationPayload<string>& l) {
+inline string serialize(const SnapshotIsolationLattice<string>& l) {
     SnapshotIsolationValue si_value;
-    si_value.set_snapshot(l.snapshot);
-    si_value.set_values(l.value);
+    si_value.set_snapshot(l.reveal().snapshot);
+    si_value.set_values(l.reveal().value);
     string serialized;
     si_value.SerializeToString(&serialized);
     return serialized;
