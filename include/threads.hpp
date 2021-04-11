@@ -87,43 +87,6 @@ class CacheThread {
   }
 };
 
-// For communication between conflict manager and cache
-class CMCacheThread {
-    Address ip_;
-    Address ip_base_;
-    unsigned tid_;
-
-public:
-    CMCacheThread(Address ip, unsigned tid) :
-            ip_(ip),
-            ip_base_("tcp://" + ip_ + ":"),
-            tid_(tid) {}
-
-    Address ip() const { return ip_; }
-
-    unsigned tid() const { return tid_; }
-
-    // Get requests to conflict manager cache
-    Address cache_get_bind_address() const { return "ipc:///requests/cm_get"; }
-
-    Address cache_get_connect_address() const { return "ipc:///requests/cm_get"; }
-
-    // Put requests to conflict manager cache
-    Address cache_put_bind_address() const { return "ipc:///requests/cm_put"; }
-
-    Address cache_put_connect_address() const { return "ipc:///requests/cm_put"; }
-
-    // Get requests response from conflict manager cache
-    Address cache_get_response_bind_address() const { return "ipc:///requests/cm_get_response_" + std::to_string(tid()); }
-
-    Address cache_get_response_connect_address() const { return "ipc:///requests/cm_get_response_" + std::to_string(tid()); }
-
-    // Put requests response from conflict manager cache
-    Address cache_put_response_bind_address() const { return "ipc:///requests/cm_put_response_" + std::to_string(tid()); }
-
-    Address cache_put_response_connect_address() const { return "ipc:///requests/cm_put_response_" + std::to_string(tid()); }
-};
-
 // Communication between Conflict managers
 class ConflictManagerThread {
     Address ip_;
@@ -139,6 +102,33 @@ public:
     Address ip() const { return ip_; }
 
     unsigned tid() const { return tid_; }
+
+    // Request key
+    Address key_request_connect_address() const {
+        return ip_base_ + std::to_string(tid_ + keyRequestPort);
+    }
+
+    Address key_request_bind_address() const {
+        return kBindBase + std::to_string(tid_ + keyRequestPort);
+    }
+
+    // Request key version
+    Address key_version_request_connect_address() const {
+        return ip_base_ + std::to_string(tid_ + keyVersionRequestPort);
+    }
+
+    Address key_version_request_bind_address() const {
+        return kBindBase + std::to_string(tid_ + keyVersionRequestPort);
+    }
+
+    // Commit begin requests from coordinators
+    Address commit_begin_connect_address() const {
+        return ip_base_ + std::to_string(tid_ + commitBeginPort);
+    }
+
+    Address commit_begin_bind_address() const {
+        return kBindBase + std::to_string(tid_ + commitBeginPort);
+    }
 
     // Commit prepare requests from coordinators
     Address commit_prepare_connect_address() const {
@@ -159,32 +149,9 @@ public:
         return kBindBase + std::to_string(tid_ + commitPort);
     }
 
-    // Commit begin requests from coordinators
-    Address commit_begin_connect_address() const {
-        return ip_base_ + std::to_string(tid_ + commitBeginPort);
-    }
 
-    Address commit_begin_bind_address() const {
-        return kBindBase + std::to_string(tid_ + commitBeginPort);
-    }
 
-    // Request key version
-    Address key_version_request_connect_address() const {
-        return ip_base_ + std::to_string(tid_ + keyVersionRequestPort);
-    }
 
-    Address key_version_request_bind_address() const {
-        return kBindBase + std::to_string(tid_ + keyVersionRequestPort);
-    }
-
-    // Request key
-    Address key_request_connect_address() const {
-        return ip_base_ + std::to_string(tid_ + keyRequestPort);
-    }
-
-    Address key_request_bind_address() const {
-        return kBindBase + std::to_string(tid_ + keyRequestPort);
-    }
 };
 
 // ConflictManagerClient threads
