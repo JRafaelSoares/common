@@ -13,9 +13,9 @@ class ConflictManagerClientInterface {
 public:
     virtual zmq::context_t* get_context() = 0;
     virtual vector<SIResponse> receive_async() = 0;
-    virtual void get_key_async(const Key& key, google::protobuf::Timestamp snapshot) = 0;
-    virtual void get_key_async(vector<Key> keys, vector<google::protobuf::Timestamp> snapshot) = 0;
-    virtual void get_key_version_async(const Key& key, google::protobuf::Timestamp snapshot) = 0;
-    virtual void get_key_version_async(vector<Key> keys, google::protobuf::Timestamp snapshot) = 0;
+    virtual void get_key_async(const Key& key, time_t snapshot) = 0;
+    virtual void get_key_async(vector<Key> keys, vector<time_t> snapshot) = 0;
+    virtual void get_key_version_async(const Key& key, time_t snapshot) = 0;
+    virtual void get_key_version_async(vector<Key> keys, time_t snapshot) = 0;
     virtual void commit_async() = 0;
 };

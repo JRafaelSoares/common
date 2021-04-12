@@ -4,6 +4,14 @@
 
 #include "conflict_manager_client.h"
 #include <google/protobuf/util/time_util.h>
+struct PendingRequests {
+    PendingRequests() = default;
+    PendingRequests(set<Key> read_set) :
+        read_set_(read_set) {}
+
+    set<Key> read_set_;
+    KeyResponse response_;
+};
 
 class ConflictManagerClient : public ConflictManagerClientInterface {
 public:
@@ -65,33 +73,35 @@ public:
     }
     zmq::context_t* get_context() { return &context_; }
 
-    void get_key_async(const Key& key, google::protobuf::Timestamp snapshot){
+    void get_key_async(const Key& key, time_t snapshot){
         // transform key into a vector
         vector<Key> keys_requested;
         keys_requested.push_back(key);
-        vector<google::protobuf::Timestamp> timestamp_vector;
-        timestamp_vector.push_back(snapshot);
-        get_key_async(keys_requested, timestamp_vector);
+        vector<time_t> snapshots;
+        snapshots.push_back(snapshot);
+        get_key_async(keys_requested, snapshots);
     }
 
-    void get_key_async(vector<Key> keys, vector<google::protobuf::Timestamp> snapshot){
-        SIRequest request;
-        request.set_response_address(cmct_.key_get_response_connect_address());
-        request.set_request_id(get_request_id());
+    void get_key_async(vector<Key> keys, vector<time_t> snapshot){
+        for (int key = 0; key < keys.size(); key++){
+            KeyRequest request;
 
-        for(Key key : keys){
-            SITuple* tuple = request.add_tuples();
-            tuple->set_key(key);
+            request.set_response_address(cmct_.key_get_response_connect_address());
+            request.set_request_id(get_request_id());
+            request.set_snapshot(snapshot[key]);
+            KeyTuple* tuple = request.add_tuples();
+            tuple->set_key(keys[key]);
+            Address worker = get_key_worker_thread();
+            send_request<KeyRequest>(request, socket_cache_[worker]);
         }
-        Address worker = get_key_worker_thread();
-        send_request<SIRequest>(request, socket_cache_[worker]);
-    }
-
-    void get_key_version_async(const Key& key, google::protobuf::Timestamp snapshot){
 
     }
 
-    void get_key_version_async(vector<Key> key, google::protobuf::Timestamp snapshot){
+    void get_key_version_async(const Key& key, time_t snapshot){
+
+    }
+
+    void get_key_version_async(vector<Key> key, time_t snapshot){
 
     }
 
