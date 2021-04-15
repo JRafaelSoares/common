@@ -32,7 +32,7 @@ struct PendingRequest {
 class KvsSIClientInterface {
  public:
   virtual string put_async(const Key& key, const string& payload,
-                           LatticeType lattice_type, const time_t& snapshot) = 0;
+                           LatticeType lattice_type) = 0;
   virtual void get_async(const Key& key, const time_t& snapshot) = 0;
   virtual vector<KeyResponse> receive_async() = 0;
   virtual zmq::context_t* get_context() = 0;
@@ -86,14 +86,15 @@ class KvsSIClient : public KvsSIClientInterface {
    * Issue an async PUT request to the KVS for a certain lattice typed value.
    */
   string put_async(const Key& key, const string& payload,
-                   LatticeType lattice_type, const time_t& snapshot) {
+                   LatticeType lattice_type) {
     KeyRequest request;
     KeyTuple* tuple = prepare_data_request(request, key);
     request.set_type(RequestType::PUT);
     tuple->set_lattice_type(lattice_type);
     tuple->set_payload(payload);
 
-    try_request(request, snapshot);
+    // put requests dont need a snapshot so we pass it as 0
+    try_request(request, 0);
     return request.request_id();
   }
 
@@ -327,14 +328,16 @@ class KvsSIClient : public KvsSIClientInterface {
 
       pending_get_response_map_[key][snapshot].worker_addr_ = worker;
     } else {
-      if (pending_put_response_map_[key].find(request.request_id()) ==
-          pending_put_response_map_[key].end()) {
-        pending_put_response_map_[key][request.request_id()].tp_ =
-            std::chrono::system_clock::now();
-        pending_put_response_map_[key][request.request_id()].request_ = request;
-      }
-      pending_put_response_map_[key][request.request_id()].worker_addr_ =
-          worker;
+        if (pending_put_response_map_.find(key) == pending_put_response_map_.end()){
+            map<string, PendingRequest> new_request;
+            new_request[request.request_id()].tp_ = std::chrono::system_clock::now();
+            new_request[request.request_id()].request_ = request;
+            pending_put_response_map_[key] = new_request;
+        } else if (pending_put_response_map_[key].find(request.request_id()) == pending_put_response_map_[key].end()) {
+            pending_put_response_map_[key][request.request_id()].tp_ = std::chrono::system_clock::now();
+            pending_put_response_map_[key][request.request_id()].request_ = request;
+        }
+        pending_put_response_map_[key][request.request_id()].worker_addr_ = worker;
     }
   }
 

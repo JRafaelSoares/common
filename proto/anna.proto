@@ -27,6 +27,9 @@ enum RequestType {
 
   // A request to put data into the KVS.
   PUT = 2;
+
+  // A request to get a version from the KVS.
+  GET_VERSION = 3;
 }
 
 enum LatticeType {

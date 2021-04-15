@@ -201,6 +201,14 @@ inline string serialize(const SnapshotIsolationLattice<string>& l) {
     return serialized;
 }
 
+inline string serialize(const time_t& snapshot) {
+    SnapshotIsolationValue snapshot_isolation_value;
+    snapshot_isolation_value.set_snapshot(snapshot);
+    string serialized;
+    snapshot_isolation_value.SerializeToString(&serialized);
+    return serialized;
+}
+
 inline string serialize(const PriorityLattice<double, string>& l) {
   PriorityValue priority_value;
   priority_value.set_priority(l.reveal().priority);

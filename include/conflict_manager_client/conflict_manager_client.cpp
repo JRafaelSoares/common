@@ -3,14 +3,20 @@
 //
 
 #include "conflict_manager_client.h"
-#include <google/protobuf/util/time_util.h>
+
+using TimePoint = std::chrono::time_point<std::chrono::system_clock>;
+
 struct PendingRequests {
     PendingRequests() = default;
-    PendingRequests(set<Key> read_set) :
-        read_set_(read_set) {}
+    PendingRequests(set<Key> read_set, TimePoint tp, KeyRequest request) :
+        read_set_(read_set),
+        tp_(tp),
+        request_(request){}
 
+    KeyRequest request_;
     set<Key> read_set_;
     KeyResponse response_;
+    TimePoint tp_;
 };
 
 class ConflictManagerClient : public ConflictManagerClientInterface {
@@ -54,59 +60,169 @@ public:
 
 public:
 
-    vector<SIResponse> receive_async() {
-        vector<SIResponse> result;
+    vector<KeyResponse> receive_async() {
+        vector<KeyResponse> result;
         kZmqUtil->poll(0, &pollitems_);
         if (pollitems_[0].revents & ZMQ_POLLIN) {
+            string serialized = kZmqUtil->recv_string(&key_get_response_puller_);
+            KeyResponse response;
+            response.ParseFromString(serialized);
 
+            if (pending_requests_.find(response.response_id()) != pending_requests_.end()){
+                PendingRequests pending = pending_requests_[response.response_id()];
+                pending.response_.set_type(response.type());
+
+                for (const auto &tuple : response.tuples()) {
+                    Key key = tuple.key();
+                    pending.read_set_.erase(key);
+                    auto tup = pending.response_.add_tuples();
+                    tup->set_key(key);
+                    tup->set_lattice_type(tuple.lattice_type());
+                    tup->set_payload(tuple.payload());
+                    tup->set_error(tuple.error());
+                }
+
+                if (pending.read_set_.empty()){
+                    result.push_back(pending.response_);
+                    pending_requests_.erase(response.response_id());
+                }
+            } else {
+                log_->error("Request does not exist");
+            }
         }
 
         if (pollitems_[1].revents & ZMQ_POLLIN) {
+            string serialized = kZmqUtil->recv_string(&key_get_version_response_puller_);
+            KeyResponse response;
+            response.ParseFromString(serialized);
 
+            if (pending_requests_.find(response.response_id()) != pending_requests_.end()){
+                PendingRequests pending = pending_requests_[response.response_id()];
+                pending.response_.set_type(response.type());
+
+                for (const auto &tuple : response.tuples()) {
+                    Key key = tuple.key();
+                    pending.read_set_.erase(key);
+                    auto tup = pending.response_.add_tuples();
+                    tup->set_key(key);
+                    tup->set_payload(tuple.payload());
+                    tup->set_error(tuple.error());
+                }
+
+                if (pending.read_set_.empty()){
+                    result.push_back(pending.response_);
+                    pending_requests_.erase(response.response_id());
+                }
+            } else {
+                log_->error("Request does not exist");
+            }
         }
 
         if (pollitems_[2].revents & ZMQ_POLLIN) {
+            string serialized = kZmqUtil->recv_string(&commit_response_puller_);
+            KeyResponse response;
+            response.ParseFromString(serialized);
 
+            if (pending_requests_.find(response.response_id()) != pending_requests_.end()){
+                PendingRequests pending = pending_requests_[response.response_id()];
+                pending.response_.set_type(response.type());
+
+                for (const auto &tuple : response.tuples()) {
+                    Key key = tuple.key();
+                    pending.read_set_.erase(key);
+                    auto tup = pending.response_.add_tuples();
+                    tup->set_key(key);
+                    tup->set_error(tuple.error());
+                }
+
+                if (pending.read_set_.empty()){
+                    result.push_back(pending.response_);
+                    pending_requests_.erase(response.response_id());
+                }
+            } else {
+                log_->error("Request does not exist");
+            }
         }
 
+        // GC the pending request map
+        set<string> to_remove;
+        for (const auto& pair : pending_requests_) {
+            if (std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now() - pair.second.tp_)
+                        .count() > timeout_) {
+                // query to the routing tier timed out
+                result.push_back(generate_bad_response(pair.second.request_));
+
+                to_remove.insert(pair.first);
+            }
+        }
         return result;
     }
     zmq::context_t* get_context() { return &context_; }
 
     void get_key_async(const Key& key, time_t snapshot){
         // transform key into a vector
-        vector<Key> keys_requested;
-        keys_requested.push_back(key);
-        vector<time_t> snapshots;
-        snapshots.push_back(snapshot);
-        get_key_async(keys_requested, snapshots);
+        set<Key> keys_requested;
+        keys_requested.insert(key);
+        get_key_async(keys_requested, snapshot);
     }
 
-    void get_key_async(vector<Key> keys, vector<time_t> snapshot){
-        for (int key = 0; key < keys.size(); key++){
-            KeyRequest request;
-
-            request.set_response_address(cmct_.key_get_response_connect_address());
-            request.set_request_id(get_request_id());
-            request.set_snapshot(snapshot[key]);
+    void get_key_async(set<Key> keys, time_t snapshot){
+        KeyRequest request;
+        request.set_type(RequestType::GET);
+        request.set_response_address(cmct_.key_get_response_connect_address());
+        string request_id = get_request_id();
+        request.set_request_id(request_id);
+        request.set_snapshot(snapshot);
+        for (auto const& key: keys){
             KeyTuple* tuple = request.add_tuples();
-            tuple->set_key(keys[key]);
-            Address worker = get_key_worker_thread();
-            send_request<KeyRequest>(request, socket_cache_[worker]);
+            tuple->set_key(key);
         }
-
+        pending_requests_.emplace(request_id, PendingRequests(keys, std::chrono::system_clock::now(), request));
+        Address worker = get_key_worker_thread();
+        send_request<KeyRequest>(request, socket_cache_[worker]);
     }
 
     void get_key_version_async(const Key& key, time_t snapshot){
+        set<Key> keys_requested;
+        keys_requested.insert(key);
+        get_key_version_async(keys_requested, snapshot);
+    }
+
+    void get_key_version_async(set<Key> keys, time_t snapshot){
+        KeyRequest request;
+        request.set_type(RequestType::GET_VERSION);
+        request.set_response_address(cmct_.key_get_version_response_connect_address());
+        string request_id = get_request_id();
+        request.set_request_id(request_id);
+        request.set_snapshot(snapshot);
+        for (auto const& key: keys){
+            KeyTuple* tuple = request.add_tuples();
+            tuple->set_key(key);
+        }
+        pending_requests_.emplace(request_id, PendingRequests(keys, std::chrono::system_clock::now(), request));
+        Address worker = get_key_version_worker_thread();
+        send_request<KeyRequest>(request, socket_cache_[worker]);
 
     }
 
-    void get_key_version_async(vector<Key> key, time_t snapshot){
-
-    }
-
-    void commit_async(){
-
+    void commit_async(vector<Key> keys, vector<string> payloads, LatticeType type){
+        KeyRequest request;
+        request.set_type(RequestType::PUT);
+        request.set_response_address(cmct_.commit_response_connect_address());
+        string request_id = get_request_id();
+        request.set_request_id(request_id);
+        set<Key> key_set;
+        for (int key = 0; key < keys.size(); key++){
+            auto tuple = request.add_tuples();
+            tuple->set_key(keys[key]);
+            tuple->set_lattice_type(type);
+            tuple->set_payload(payloads[key]);
+            key_set.insert(keys[key]);
+        }
+        pending_requests_.emplace(request_id, PendingRequests(key_set, std::chrono::system_clock::now(), request));
+        Address worker = commit_worker_thread();
+        send_request<KeyRequest>(request, socket_cache_[worker]);
     }
 
     // Get request id to correspond between
@@ -126,6 +242,33 @@ public:
     string get_key_version_worker_thread(){
         //return conflict_manager_threads_[rand_r(&seed_) % conflict_manager_threads_.size()].key_request_connect_address();
         return conflict_manager_threads_[0].key_version_request_connect_address();
+    }
+
+    // Get which thread to send the commit request
+    string commit_worker_thread(){
+        //return conflict_manager_threads_[rand_r(&seed_) % conflict_manager_threads_.size()].key_request_connect_address();
+        return conflict_manager_threads_[0].commit_connect_address();
+    }
+
+    KeyResponse generate_bad_response(const KeyRequest& req) {
+        KeyResponse resp;
+
+        resp.set_type(req.type());
+        resp.set_response_id(req.request_id());
+        resp.set_error(AnnaError::TIMEOUT);
+        resp.set_snapshot(req.snapshot());
+
+        for (auto const& tup: req.tuples()){
+            KeyTuple* tp = resp.add_tuples();
+            tp->set_key(tup.key());
+
+            if (req.type() == RequestType::PUT) {
+                tp->set_lattice_type(tup.lattice_type());
+                tp->set_payload(tup.payload());
+            }
+        }
+
+        return resp;
     }
 
 
@@ -159,4 +302,6 @@ private:
 
     // cache for opened sockets
     SocketCache socket_cache_;
+
+    map<string, PendingRequests> pending_requests_;
 };
