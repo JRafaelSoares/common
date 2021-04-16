@@ -172,7 +172,8 @@ public:
         request.set_response_address(cmct_.key_get_response_connect_address());
         string request_id = get_request_id();
         request.set_request_id(request_id);
-        request.set_snapshot(snapshot);
+        // We make +1 so it includes the snapshot value as well
+        request.set_snapshot(snapshot+1);
         for (auto const& key: keys){
             KeyTuple* tuple = request.add_tuples();
             tuple->set_key(key);
@@ -194,7 +195,8 @@ public:
         request.set_response_address(cmct_.key_get_version_response_connect_address());
         string request_id = get_request_id();
         request.set_request_id(request_id);
-        request.set_snapshot(snapshot);
+        // We make +1 so it includes the snapshot value as well
+        request.set_snapshot(snapshot+1);
         for (auto const& key: keys){
             KeyTuple* tuple = request.add_tuples();
             tuple->set_key(key);
