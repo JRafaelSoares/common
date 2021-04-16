@@ -11,7 +11,9 @@ struct PendingRequests {
     PendingRequests(set<Key> read_set, TimePoint tp, KeyRequest request) :
         read_set_(read_set),
         tp_(tp),
-        request_(request){}
+        request_(request){
+        response_.set_type(request.type());
+    }
 
     KeyRequest request_;
     set<Key> read_set_;
@@ -70,7 +72,6 @@ public:
 
             if (pending_requests_.find(response.response_id()) != pending_requests_.end()){
                 PendingRequests pending = pending_requests_[response.response_id()];
-                pending.response_.set_type(response.type());
 
                 for (const auto &tuple : response.tuples()) {
                     Key key = tuple.key();
@@ -98,7 +99,6 @@ public:
 
             if (pending_requests_.find(response.response_id()) != pending_requests_.end()){
                 PendingRequests pending = pending_requests_[response.response_id()];
-                pending.response_.set_type(response.type());
 
                 for (const auto &tuple : response.tuples()) {
                     Key key = tuple.key();
@@ -125,7 +125,6 @@ public:
 
             if (pending_requests_.find(response.response_id()) != pending_requests_.end()){
                 PendingRequests pending = pending_requests_[response.response_id()];
-                pending.response_.set_type(response.type());
 
                 for (const auto &tuple : response.tuples()) {
                     Key key = tuple.key();
