@@ -207,10 +207,11 @@ public:
 
     }
 
-    void commit_async(vector<Key> keys, vector<string> payloads, LatticeType type){
+    void commit_async(vector<Key> keys, vector<string> payloads, LatticeType type, time_t snapshot){
         KeyRequest request;
         request.set_type(RequestType::PUT);
         request.set_response_address(cmct_.commit_response_connect_address());
+        request.set_snapshot(snapshot);
         string request_id = get_request_id();
         request.set_request_id(request_id);
         set<Key> key_set;
@@ -248,7 +249,7 @@ public:
     // Get which thread to send the commit request
     string commit_worker_thread(){
         //return conflict_manager_threads_[rand_r(&seed_) % conflict_manager_threads_.size()].key_request_connect_address();
-        return conflict_manager_threads_[0].commit_connect_address();
+        return conflict_manager_threads_[0].commit_begin_connect_address();
     }
 
     KeyResponse generate_bad_response(const KeyRequest& req) {

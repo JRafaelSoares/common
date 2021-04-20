@@ -42,3 +42,19 @@ message SIResponse {
   // 1-to-1 mapping with the SITuple in the corresponding SIRequest.
   repeated SITuple tuples = 1;
 }
+
+message SIPrepare {
+    // Keys to write
+    string request = 1;
+
+    // The coordinator address
+    string coordinator_address = 2;
+}
+
+message SICommit {
+    // Request id of the commit
+    string request_id = 1;
+
+    // Commit time
+    uint64 commit_time = 2;
+}

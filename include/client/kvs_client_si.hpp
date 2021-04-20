@@ -20,7 +20,7 @@
 #include "requests.hpp"
 #include "threads.hpp"
 #include "types.hpp"
-
+#include "snapshot_isolation.pb.h"
 using TimePoint = std::chrono::time_point<std::chrono::system_clock>;
 
 struct PendingRequest {

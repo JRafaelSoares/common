@@ -19,7 +19,7 @@ public:
     virtual void get_key_async(set<Key> keys, time_t snapshot) = 0;
     virtual void get_key_version_async(const Key& key, time_t snapshot) = 0;
     virtual void get_key_version_async(set<Key> keys, time_t snapshot) = 0;
-    virtual void commit_async(vector<Key> keys, vector<string> payloads, LatticeType type) = 0;
+    virtual void commit_async(vector<Key> keys, vector<string> payloads, LatticeType type, time_t snapshot) = 0;
 };
 
 #endif //FAASSI_CONFLICT_MANAGER_CLIENT_H
