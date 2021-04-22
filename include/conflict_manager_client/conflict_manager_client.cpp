@@ -133,6 +133,7 @@ public:
             }
         }
 
+        /*
         // GC the pending request map
         set<string> to_remove;
         for (const auto& pair : pending_requests_) {
@@ -149,6 +150,7 @@ public:
         for (const auto& request : to_remove) {
             pending_requests_.erase(request);
         }
+         */
         return result;
     }
 
@@ -182,6 +184,7 @@ public:
         }
 
         // GC the pending request map
+        /*
         set<string> to_remove;
         for (const auto& pair : pending_commit_requests_) {
             if (std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -197,6 +200,7 @@ public:
         for (const auto& request : to_remove) {
             pending_commit_requests_.erase(request);
         }
+         */
         return result;
     }
     zmq::context_t* get_context() { return &context_; }
@@ -212,7 +216,7 @@ public:
         KeyRequest request;
         request.set_type(RequestType::GET);
         request.set_response_address(cmct_.key_get_response_connect_address());
-        string request_id = get_request_id();
+        string request_id = get_request_id(snapshot);
         request.set_request_id(request_id);
         // We make +1 so it includes the snapshot value as well
         request.set_snapshot(snapshot+1);
@@ -235,7 +239,7 @@ public:
         KeyRequest request;
         request.set_type(RequestType::GET_VERSION);
         request.set_response_address(cmct_.key_get_version_response_connect_address());
-        string request_id = get_request_id();
+        string request_id = get_request_id(snapshot);
         request.set_request_id(request_id);
         // We make +1 so it includes the snapshot value as well
         request.set_snapshot(snapshot+1);
@@ -254,7 +258,7 @@ public:
         KeyRequest request;
         request.set_type(RequestType::PUT);
         request.set_snapshot(snapshot);
-        string request_id = get_request_id();
+        string request_id = get_request_id(snapshot);
         request.set_request_id(request_id);
         set<Key> key_set;
         for (int key = 0; key < keys.size(); key++){
@@ -283,10 +287,8 @@ public:
     }
 
     // Get request id to correspond between
-    string get_request_id() {
-        if (++rid_ % 10000 == 0) rid_ = 0;
-        return cmct_.ip() + ":" + std::to_string(cmct_.tid()) + "_" +
-               std::to_string(rid_++);
+    string get_request_id(time_t snapshot) {
+        return std::to_string(snapshot)+ "_" + cmct_.ip() + ":" + std::to_string(cmct_.tid());
     }
 
     // Get which thread to send the get key request
