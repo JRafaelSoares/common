@@ -21,6 +21,21 @@ struct PendingRequests {
     TimePoint tp_;
 };
 
+struct PendingCommitRequests {
+    PendingCommitRequests() = default;
+    PendingCommitRequests(set<Key> read_set, TimePoint tp, CommitRequest request) :
+            read_set_(read_set),
+            tp_(tp),
+            request_(request){
+        response_.set_request_id(request.request_id());
+    }
+
+    CommitRequest request_;
+    set<Key> read_set_;
+    CommitResponse response_;
+    TimePoint tp_;
+};
+
 class ConflictManagerClient : public ConflictManagerClientInterface {
 public:
     ConflictManagerClient(vector<ConflictManagerThread> conflict_manager_threads,
@@ -98,7 +113,7 @@ public:
             response.ParseFromString(serialized);
 
             if (pending_requests_.find(response.response_id()) != pending_requests_.end()){
-                PendingRequests pending = pending_requests_[response.response_id()];
+                auto &pending = pending_requests_[response.response_id()];
 
                 for (const auto &tuple : response.tuples()) {
                     Key key = tuple.key();
@@ -106,31 +121,6 @@ public:
                     auto tup = pending.response_.add_tuples();
                     tup->set_key(key);
                     tup->set_payload(tuple.payload());
-                    tup->set_error(tuple.error());
-                }
-
-                if (pending.read_set_.empty()){
-                    result.push_back(pending.response_);
-                    pending_requests_.erase(response.response_id());
-                }
-            } else {
-                log_->error("Request does not exist");
-            }
-        }
-
-        if (pollitems_[2].revents & ZMQ_POLLIN) {
-            string serialized = kZmqUtil->recv_string(&commit_response_puller_);
-            KeyResponse response;
-            response.ParseFromString(serialized);
-
-            if (pending_requests_.find(response.response_id()) != pending_requests_.end()){
-                PendingRequests pending = pending_requests_[response.response_id()];
-
-                for (const auto &tuple : response.tuples()) {
-                    Key key = tuple.key();
-                    pending.read_set_.erase(key);
-                    auto tup = pending.response_.add_tuples();
-                    tup->set_key(key);
                     tup->set_error(tuple.error());
                 }
 
@@ -155,6 +145,48 @@ public:
                 to_remove.insert(pair.first);
             }
         }
+        return result;
+    }
+
+    vector<CommitResponse> receive_commit_async(){
+        vector<CommitResponse> result;
+        kZmqUtil->poll(0, &pollitems_);
+        if (pollitems_[2].revents & ZMQ_POLLIN) {
+            string serialized = kZmqUtil->recv_string(&commit_response_puller_);
+            CommitResponse response;
+            response.ParseFromString(serialized);
+
+            if (pending_commit_requests_.find(response.request_id()) != pending_commit_requests_.end()){
+                auto &pending = pending_commit_requests_[response.request_id()];
+
+                for (const auto &key : response.committed_keys()) {
+                    pending.read_set_.erase(key);
+                    pending.response_.set_commit_time(response.commit_time());
+                }
+
+                if (pending.read_set_.empty()){
+                    result.push_back(pending.response_);
+                    pending_commit_requests_.erase(response.request_id());
+                }
+            } else {
+                log_->error("Request does not exist");
+            }
+        }
+
+        // GC the pending request map
+        /*
+        set<string> to_remove;
+        for (const auto& pair : pending_requests_) {
+            if (std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now() - pair.second.tp_)
+                        .count() > timeout_) {
+                // query to the routing tier timed out
+                result.push_back(generate_bad_response(pair.second.request_));
+
+                to_remove.insert(pair.first);
+            }
+        }
+         */
         return result;
     }
     zmq::context_t* get_context() { return &context_; }
@@ -208,9 +240,9 @@ public:
     }
 
     void commit_async(vector<Key> keys, vector<string> payloads, LatticeType type, time_t snapshot){
+        // Make "PUT" request for the keys to be committed
         KeyRequest request;
         request.set_type(RequestType::PUT);
-        request.set_response_address(cmct_.commit_response_connect_address());
         request.set_snapshot(snapshot);
         string request_id = get_request_id();
         request.set_request_id(request_id);
@@ -222,9 +254,22 @@ public:
             tuple->set_payload(payloads[key]);
             key_set.insert(keys[key]);
         }
-        pending_requests_.emplace(request_id, PendingRequests(key_set, std::chrono::system_clock::now(), request));
+        string serialized_key_request;
+        request.SerializeToString(&serialized_key_request);
+
+        // Make commit request
+        CommitRequest commit_request;
         Address worker = commit_worker_thread();
-        send_request<KeyRequest>(request, socket_cache_[worker]);
+
+        commit_request.set_commit_type(CommitType::C_BEGIN);
+        commit_request.set_coordinator_address(worker);
+        commit_request.set_request_id(request_id);
+        commit_request.set_key_request(serialized_key_request);
+        Address response_address = cmct_.commit_response_connect_address();
+        commit_request.set_client_address(response_address);
+        pending_commit_requests_.emplace(request_id, PendingCommitRequests(key_set, std::chrono::system_clock::now(), commit_request));
+
+        send_request<CommitRequest>(commit_request, socket_cache_[worker]);
     }
 
     // Get request id to correspond between
@@ -249,7 +294,7 @@ public:
     // Get which thread to send the commit request
     string commit_worker_thread(){
         //return conflict_manager_threads_[rand_r(&seed_) % conflict_manager_threads_.size()].key_request_connect_address();
-        return conflict_manager_threads_[0].commit_begin_connect_address();
+        return conflict_manager_threads_[0].commit_connect_address();
     }
 
     KeyResponse generate_bad_response(const KeyRequest& req) {
@@ -306,4 +351,6 @@ private:
     SocketCache socket_cache_;
 
     map<string, PendingRequests> pending_requests_;
+    map<string, PendingCommitRequests> pending_commit_requests_;
+
 };

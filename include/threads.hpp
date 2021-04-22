@@ -53,9 +53,6 @@ const unsigned clientKeyVersionGetPort = 7500;
 // The port on which conflict managers listen for key requests
 const unsigned clientCommitPort = 7550;
 
-// The port on which coordinator conflict manager receives the request to initiates a commit
-const unsigned commitBeginPort = 7600;
-
 const string kBindBase = "tcp://*:";
 
 class CacheThread {
@@ -125,25 +122,6 @@ public:
     }
 
     // Commit begin requests from client
-    Address commit_begin_connect_address() const {
-        return ip_base_ + std::to_string(tid_ + commitBeginPort);
-    }
-
-    Address commit_begin_bind_address() const {
-        return kBindBase + std::to_string(tid_ + commitBeginPort);
-    }
-
-    // Commit prepare requests from coordinators
-    Address commit_prepare_connect_address() const {
-        return ip_base_ + std::to_string(tid_ + commitPreparePort);
-    }
-
-    Address commit_prepare_bind_address() const {
-        return kBindBase + std::to_string(tid_ + commitPreparePort);
-    }
-
-    // Commit finish requests from coordinators
-
     Address commit_connect_address() const {
         return ip_base_ + std::to_string(tid_ + commitPort);
     }
@@ -151,19 +129,6 @@ public:
     Address commit_bind_address() const {
         return kBindBase + std::to_string(tid_ + commitPort);
     }
-
-    // Commit begin requests from coordinators
-    Address commit_ack_connect_address() const {
-        return ip_base_ + std::to_string(tid_ + commitAckPort);
-    }
-
-    Address commit_ack_bind_address() const {
-        return kBindBase + std::to_string(tid_ + commitAckPort);
-    }
-
-
-
-
 };
 
 // ConflictManagerClient threads

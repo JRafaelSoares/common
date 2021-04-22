@@ -1,46 +1,65 @@
 syntax = "proto3";
 
-import "anna.proto";
-import "google/protobuf/timestamp.proto";
+enum CommitType {
+    // Default type
+    C_UNSPECIFIED = 0;
 
-// A message representing an individual tuple when the system is operating in
-// SI mode.
-message SITuple {
-  // The name of the key-value pair this tuple represents.
-  string key = 1;
+    // A request to begin a commit procedure
+    C_BEGIN = 1;
 
-  // The serialized payload of this key-value pair.
-  bytes payload = 2;
+    // A request to prepare a commit
+    C_PREPARE = 2;
 
-  // Any errors generated while retrieving this tuple (see CausalError).
-  AnnaError error = 3;
+    // A request to finish a commit
+    C_FINISH = 3;
 
-  // The timestamp corresponding to this key snapshot
-  google.protobuf.Timestamp timestamp = 4;
+    // A request to abort a commit
+    C_ABORT = 4;
 }
 
-// A request for one or more SI tuples, made from an executor and answered
-// by a cache.
-message SIRequest {
-  // A client-specific ID used to match asynchronous requests with responses.
+enum CommitError {
+    // No error
+    C_NO_ERROR = 0;
+
+    // Abort flag
+    C_ABORTED = 1;
+
+    // Timeout flag
+    C_TIMEOUT = 2;
+}
+
+message CommitRequest {
+    // The commit request type
+    CommitType commit_type = 1;
+
+    // The serialized KeyRequest to write/commit
+    string key_request = 2;
+
+    // The coordinator address
+    string coordinator_address = 3;
+
+    // Request id of the commit
+    string request_id = 4;
+
+    // Commit time
+    uint64 commit_time = 5;
+
+    // Response address
+    string client_address = 6;
+}
+
+message CommitResponse {
+    // Request id of the commit
     string request_id = 1;
 
-  // The set of SITuples which are being requested from the cache.
-  repeated SITuple tuples = 2;
+    // Commit time
+    uint64 commit_time = 2;
 
-  // The address at which the client will be waiting for a response for this
-  // particular request.
-  string response_address = 3;
+    // Abort flag
+    CommitError abort_flag = 3;
 
-  // The timestamp corresponding to the snapshot
-  google.protobuf.Timestamp timestamp = 4;
-}
-
-// A response to a particular CausalRequest.
-message SIResponse {
-  // The SITuple that respond to an individual request. These form a
-  // 1-to-1 mapping with the SITuple in the corresponding SIRequest.
-  repeated SITuple tuples = 1;
+    // Keys which we have committed
+    repeated string committed_keys = 4;
 }
 
 message SIPrepare {
