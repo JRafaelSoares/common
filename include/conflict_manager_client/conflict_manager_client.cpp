@@ -145,6 +145,10 @@ public:
                 to_remove.insert(pair.first);
             }
         }
+
+        for (const auto& request : to_remove) {
+            pending_requests_.erase(request);
+        }
         return result;
     }
 
@@ -157,8 +161,12 @@ public:
             response.ParseFromString(serialized);
 
             if (pending_commit_requests_.find(response.request_id()) != pending_commit_requests_.end()){
-                auto &pending = pending_commit_requests_[response.request_id()];
 
+                auto &pending = pending_commit_requests_[response.request_id()];
+                if (response.abort_flag() != CommitError::C_NO_ERROR){
+                    pending.response_.set_abort_flag(response.abort_flag());
+                    result.push_back(pending.response_);
+                }
                 for (const auto &key : response.committed_keys()) {
                     pending.read_set_.erase(key);
                     pending.response_.set_commit_time(response.commit_time());
@@ -174,19 +182,21 @@ public:
         }
 
         // GC the pending request map
-        /*
         set<string> to_remove;
-        for (const auto& pair : pending_requests_) {
+        for (const auto& pair : pending_commit_requests_) {
             if (std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::system_clock::now() - pair.second.tp_)
                         .count() > timeout_) {
                 // query to the routing tier timed out
-                result.push_back(generate_bad_response(pair.second.request_));
+                pending_commit_requests_[pair.first].response_.set_abort_flag(CommitError::C_TIMEOUT);
+                result.push_back(pending_commit_requests_[pair.first].response_);
 
                 to_remove.insert(pair.first);
             }
         }
-         */
+        for (const auto& request : to_remove) {
+            pending_commit_requests_.erase(request);
+        }
         return result;
     }
     zmq::context_t* get_context() { return &context_; }
