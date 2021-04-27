@@ -32,7 +32,7 @@ struct PendingRequest {
 class KvsSIClientInterface {
  public:
   virtual string put_async(const Key& key, const string& payload,
-                           LatticeType lattice_type) = 0;
+                           LatticeType lattice_type, time_t snapshot) = 0;
   virtual void get_async(const Key& key, const time_t& snapshot) = 0;
   virtual vector<KeyResponse> receive_async() = 0;
   virtual zmq::context_t* get_context() = 0;
@@ -86,8 +86,9 @@ class KvsSIClient : public KvsSIClientInterface {
    * Issue an async PUT request to the KVS for a certain lattice typed value.
    */
   string put_async(const Key& key, const string& payload,
-                   LatticeType lattice_type) {
+                   LatticeType lattice_type, time_t snapshot) {
     KeyRequest request;
+    request.set_snapshot(snapshot);
     KeyTuple* tuple = prepare_data_request(request, key);
     request.set_type(RequestType::PUT);
     tuple->set_lattice_type(lattice_type);
