@@ -135,10 +135,13 @@ class KvsSIClient : public KvsSIClientInterface {
           query_routing_async(key);
         } else {
           // populate cache
+          // We choose one which will be chosen for read your writes
+          key_address_cache_[key].insert(response.addresses(0).ips()[rand() % response.addresses(0).ips().size()]);
+          /*
           for (const Address& ip : response.addresses(0).ips()) {
             key_address_cache_[key].insert(ip);
           }
-
+          */
           // handle stuff in pending request map
           for (auto& req : pending_request_map_[key].second) {
             try_request(req, req.snapshot());
@@ -432,10 +435,10 @@ class KvsSIClient : public KvsSIClientInterface {
   set<Address> get_all_worker_threads(const Key& key) {
     if (key_address_cache_.find(key) == key_address_cache_.end() ||
         key_address_cache_[key].size() == 0) {
-      if (pending_request_map_.find(key) == pending_request_map_.end()) {
-        query_routing_async(key);
-      }
-      return set<Address>();
+          if (pending_request_map_.find(key) == pending_request_map_.end()) {
+            query_routing_async(key);
+          }
+          return set<Address>();
     } else {
       return key_address_cache_[key];
     }
