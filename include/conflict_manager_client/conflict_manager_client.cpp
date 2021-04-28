@@ -27,7 +27,7 @@ struct PendingCommitRequests {
             read_set_(read_set),
             tp_(tp),
             request_(request){
-        response_.set_request_id(request.request_id());
+        response_.set_response_id(request.request_id());
     }
 
     CommitRequest request_;
@@ -162,9 +162,9 @@ public:
             CommitResponse response;
             response.ParseFromString(serialized);
 
-            if (pending_commit_requests_.find(response.request_id()) != pending_commit_requests_.end()){
+            if (pending_commit_requests_.find(response.response_id()) != pending_commit_requests_.end()){
 
-                auto &pending = pending_commit_requests_[response.request_id()];
+                auto &pending = pending_commit_requests_[response.response_id()];
                 if (response.abort_flag() != CommitError::C_NO_ERROR){
                     pending.response_.set_abort_flag(response.abort_flag());
                     result.push_back(pending.response_);
@@ -176,7 +176,7 @@ public:
 
                 if (pending.read_set_.empty()){
                     result.push_back(pending.response_);
-                    pending_commit_requests_.erase(response.request_id());
+                    pending_commit_requests_.erase(response.response_id());
                 }
             } else {
                 log_->error("Request does not exist");
