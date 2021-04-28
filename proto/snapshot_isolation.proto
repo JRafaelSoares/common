@@ -50,7 +50,7 @@ message CommitRequest {
 
 message CommitResponse {
     // Request id of the commit
-    string request_id = 1;
+    string response_id = 1;
 
     // Commit time
     uint64 commit_time = 2;
