@@ -33,7 +33,7 @@ message CommitRequest {
     CommitType commit_type = 1;
 
     // The serialized KeyRequest to write/commit
-    string key_request = 2;
+    bytes key_request = 2;
 
     // The coordinator address
     string coordinator_address = 3;
