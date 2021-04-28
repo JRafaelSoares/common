@@ -81,6 +81,9 @@ enum ConsistencyType {
   // Multi-key causal more is supported (see Anna KVS definitions for more
   // detail).
   MULTI = 2;
+
+  // Snapshot Isolation mode
+  SI = 3;
 }
 
 // A message representing an individual, serialized Python function.
