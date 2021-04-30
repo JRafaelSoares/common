@@ -205,14 +205,14 @@ public:
     }
     zmq::context_t* get_context() { return &context_; }
 
-    void get_key_async(const Key& key, time_t snapshot){
+    void get_key_async(const Key& key, uint64_t snapshot){
         // transform key into a vector
         set<Key> keys_requested;
         keys_requested.insert(key);
         get_key_async(keys_requested, snapshot);
     }
 
-    void get_key_async(set<Key> keys, time_t snapshot){
+    void get_key_async(set<Key> keys, uint64_t snapshot){
         KeyRequest request;
         request.set_type(RequestType::GET);
         request.set_response_address(cmct_.key_get_response_connect_address());
@@ -229,13 +229,13 @@ public:
         send_request<KeyRequest>(request, socket_cache_[worker]);
     }
 
-    void get_key_version_async(const Key& key, time_t snapshot){
+    void get_key_version_async(const Key& key, uint64_t snapshot){
         set<Key> keys_requested;
         keys_requested.insert(key);
         get_key_version_async(keys_requested, snapshot);
     }
 
-    void get_key_version_async(set<Key> keys, time_t snapshot){
+    void get_key_version_async(set<Key> keys, uint64_t snapshot){
         KeyRequest request;
         request.set_type(RequestType::GET_VERSION);
         request.set_response_address(cmct_.key_get_version_response_connect_address());
@@ -253,7 +253,7 @@ public:
 
     }
 
-    void commit_async(vector<Key> keys, vector<string> payloads, LatticeType type, time_t snapshot){
+    void commit_async(vector<Key> keys, vector<string> payloads, LatticeType type, uint64_t snapshot){
         // Make "PUT" request for the keys to be committed
         KeyRequest request;
         request.set_type(RequestType::PUT);
@@ -287,7 +287,7 @@ public:
     }
 
     // Get request id to correspond between
-    string get_request_id(time_t snapshot) {
+    string get_request_id(uint64_t snapshot) {
         return std::to_string(snapshot)+ "_" + cmct_.ip() + ":" + std::to_string(cmct_.tid());
     }
 

@@ -32,8 +32,8 @@ struct PendingRequest {
 class KvsSIClientInterface {
  public:
   virtual string put_async(const Key& key, const string& payload,
-                           LatticeType lattice_type, time_t snapshot) = 0;
-  virtual void get_async(const Key& key, const time_t& snapshot) = 0;
+                           LatticeType lattice_type, uint64_t snapshot) = 0;
+  virtual void get_async(const Key& key, const uint64_t& snapshot) = 0;
   virtual vector<KeyResponse> receive_async() = 0;
   virtual zmq::context_t* get_context() = 0;
 };
@@ -86,7 +86,7 @@ class KvsSIClient : public KvsSIClientInterface {
    * Issue an async PUT request to the KVS for a certain lattice typed value.
    */
   string put_async(const Key& key, const string& payload,
-                   LatticeType lattice_type, time_t snapshot) {
+                   LatticeType lattice_type, uint64_t snapshot) {
     KeyRequest request;
     request.set_snapshot(snapshot);
     KeyTuple* tuple = prepare_data_request(request, key);
@@ -102,7 +102,7 @@ class KvsSIClient : public KvsSIClientInterface {
   /**
    * Issue an async GET request to the KVS.
    */
-    void get_async(const Key& key, const time_t& snapshot) {
+    void get_async(const Key& key, const uint64_t& snapshot) {
         // we issue GET only when it is not in the pending map
         if (pending_get_response_map_.find(key) ==
             pending_get_response_map_.end() &&
@@ -158,7 +158,7 @@ class KvsSIClient : public KvsSIClientInterface {
       KeyResponse response;
       response.ParseFromString(serialized);
       Key key = response.tuples(0).key();
-      time_t snapshot = response.snapshot();
+      uint64_t snapshot = response.snapshot();
 
       if (response.type() == RequestType::GET) {
           // Checks if we have any request for that key with the specific snapshot
@@ -298,7 +298,7 @@ class KvsSIClient : public KvsSIClientInterface {
    * the above implementation of try_multi_request, except it only operates on
    * a single request.
    */
-  void try_request(KeyRequest& request, time_t snapshot) {
+  void try_request(KeyRequest& request, uint64_t snapshot) {
     // we only get NULL back for the worker thread if the query to the routing
     // tier timed out, which should never happen.
     Key key = request.tuples(0).key();
@@ -320,7 +320,7 @@ class KvsSIClient : public KvsSIClientInterface {
     if (request.type() == RequestType::GET) {
       if (pending_get_response_map_.find(key) ==
           pending_get_response_map_.end() ) {
-          map<time_t, PendingRequest> new_request;
+          map<uint64_t, PendingRequest> new_request;
           new_request[snapshot].tp_ = std::chrono::system_clock::now();
           new_request[snapshot].request_ = request;
           pending_get_response_map_[key] = new_request;
@@ -554,7 +554,7 @@ class KvsSIClient : public KvsSIClientInterface {
   map<Key, pair<TimePoint, vector<KeyRequest>>> pending_request_map_;
 
   // keeps track of pending get responses
-  map<Key, map<time_t, PendingRequest>> pending_get_response_map_;
+  map<Key, map<uint64_t, PendingRequest>> pending_get_response_map_;
 
   // keeps track of pending put responses
   map<Key, map<string, PendingRequest>> pending_put_response_map_;

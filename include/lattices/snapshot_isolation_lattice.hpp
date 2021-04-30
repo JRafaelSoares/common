@@ -18,11 +18,11 @@
 #include "core_lattices.hpp"
 #include <google/protobuf/util/time_util.h>
 #include <iostream>
-const time_t minSITimeStamp = 0;
+const uint64_t minSITimeStamp = 0;
 
 template <typename T>
 struct SnapshotIsolationPayload {
-    time_t snapshot;
+    uint64_t snapshot;
     T value;
 
     SnapshotIsolationPayload<T>() {
@@ -36,13 +36,13 @@ struct SnapshotIsolationPayload {
       value = T();
   }
 
-    SnapshotIsolationPayload<T>(time_t timestamp, T v) {
+    SnapshotIsolationPayload<T>(uint64_t timestamp, T v) {
         snapshot = timestamp;
         value = v;
     }
 
   unsigned size() {
-    return sizeof(time_t) + value.size();
+    return sizeof(uint64_t) + value.size();
   }
 };
 

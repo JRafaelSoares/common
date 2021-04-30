@@ -27,7 +27,6 @@
 #include "zmq/socket_cache.hpp"
 #include "zmq/zmq_util.hpp"
 #include "lattices/snapshot_isolation_lattice.hpp"
-#include <google/protobuf/util/time_util.h>
 enum UserMetadataType { cache_ip };
 
 const string kMetadataIdentifier = "ANNA_METADATA";
@@ -201,7 +200,7 @@ inline string serialize(const SnapshotIsolationLattice<string>& l) {
     return serialized;
 }
 
-inline string serialize(const time_t& snapshot) {
+inline string serialize(const uint64_t& snapshot) {
     SnapshotIsolationValue snapshot_isolation_value;
     snapshot_isolation_value.set_snapshot(snapshot);
     string serialized;
