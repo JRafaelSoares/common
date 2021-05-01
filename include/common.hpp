@@ -26,7 +26,7 @@
 #include "types.hpp"
 #include "zmq/socket_cache.hpp"
 #include "zmq/zmq_util.hpp"
-
+#include "lattices/snapshot_isolation_lattice.hpp"
 enum UserMetadataType { cache_ip };
 
 const string kMetadataIdentifier = "ANNA_METADATA";
@@ -190,6 +190,24 @@ inline string serialize(const MultiKeyCausalLattice<SetLattice<string>>& l) {
   return serialized;
 }
 
+// We get a payload here because the lattice holds the many versions
+inline string serialize(const SnapshotIsolationLattice<string>& l) {
+    SnapshotIsolationValue snapshot_isolation_value;
+    snapshot_isolation_value.set_snapshot(l.reveal().snapshot);
+    snapshot_isolation_value.set_values(l.reveal().value);
+    string serialized;
+    snapshot_isolation_value.SerializeToString(&serialized);
+    return serialized;
+}
+
+inline string serialize(const uint64_t& snapshot) {
+    SnapshotIsolationValue snapshot_isolation_value;
+    snapshot_isolation_value.set_snapshot(snapshot);
+    string serialized;
+    snapshot_isolation_value.SerializeToString(&serialized);
+    return serialized;
+}
+
 inline string serialize(const PriorityLattice<double, string>& l) {
   PriorityValue priority_value;
   priority_value.set_priority(l.reveal().priority);
@@ -247,6 +265,14 @@ inline MultiKeyCausalValue deserialize_multi_key_causal(
   return mk_causal;
 }
 
+inline SnapshotIsolationValue deserialize_snapshot_isolation(
+        const string& serialized) {
+    SnapshotIsolationValue si;
+    si.ParseFromString(serialized);
+
+    return si;
+}
+
 inline PriorityLattice<double, string> deserialize_priority(
     const string& serialized) {
   PriorityValue pv;
@@ -289,6 +315,15 @@ inline MultiKeyCausalPayload<SetLattice<string>> to_multi_key_causal_payload(
   }
 
   return p;
+}
+
+inline SnapshotIsolationPayload<string> to_snapshot_isolation_payload(
+        const SnapshotIsolationValue& si) {
+    SnapshotIsolationPayload<string> p;
+
+    p.value = si.values();
+    p.snapshot = si.snapshot();
+    return p;
 }
 
 struct lattice_type_hash {

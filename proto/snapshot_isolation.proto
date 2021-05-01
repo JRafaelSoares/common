@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+enum CommitType {
+    // Default type
+    C_UNSPECIFIED = 0;
+
+    // A request to begin a commit procedure
+    C_BEGIN = 1;
+
+    // A request to prepare a commit
+    C_PREPARE = 2;
+
+    // A request to finish a commit
+    C_FINISH = 3;
+
+    // A request to abort a commit
+    C_ABORT = 4;
+}
+
+enum CommitError {
+    // No error
+    C_NO_ERROR = 0;
+
+    // Abort flag
+    C_ABORTED = 1;
+
+    // Timeout flag
+    C_TIMEOUT = 2;
+}
+
+message CommitRequest {
+    // The commit request type
+    CommitType commit_type = 1;
+
+    // The serialized KeyRequest to write/commit
+    bytes key_request = 2;
+
+    // The coordinator address
+    string coordinator_address = 3;
+
+    // Request id of the commit
+    string request_id = 4;
+
+    // Commit time
+    uint64 commit_time = 5;
+
+    // Response address
+    string client_address = 6;
+}
+
+message CommitResponse {
+    // Request id of the commit
+    string response_id = 1;
+
+    // Commit time
+    uint64 commit_time = 2;
+
+    // Abort flag
+    CommitError abort_flag = 3;
+
+    // Keys which we have committed
+    repeated string committed_keys = 4;
+}
+
+message SIPrepare {
+    // Keys to write
+    string request = 1;
+
+    // The coordinator address
+    string coordinator_address = 2;
+}
+
+message SICommit {
+    // Request id of the commit
+    string request_id = 1;
+
+    // Commit time
+    uint64 commit_time = 2;
+}

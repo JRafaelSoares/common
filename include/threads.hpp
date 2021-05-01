@@ -29,6 +29,30 @@ const unsigned kUserKeyAddressPort = 6850;
 // The port on which cache nodes listen for updates from the KVS.
 const unsigned kCacheUpdatePort = 7150;
 
+// The port on which conflict manager nodes listen for commit prepare requests
+const unsigned commitPreparePort = 7200;
+
+// The port on which conflict manager nodes listen for commit  requests
+const unsigned commitPort = 7250;
+
+// The port on which coordinator conflict manager receives the acks from the commit process
+const unsigned commitAckPort = 7300;
+
+// The port on which conflict managers listen for key version requests
+const unsigned keyVersionRequestPort = 7350;
+
+// The port on which conflict managers listen for key requests
+const unsigned keyRequestPort = 7400;
+
+// The port on which coordinator conflict manager receives the request to initiates a commit
+const unsigned clientKeyGetPort = 7450;
+
+// The port on which conflict managers listen for key version requests
+const unsigned clientKeyVersionGetPort = 7500;
+
+// The port on which conflict managers listen for key requests
+const unsigned clientCommitPort = 7550;
+
 const string kBindBase = "tcp://*:";
 
 class CacheThread {
@@ -62,6 +86,93 @@ class CacheThread {
     return ip_base_ + std::to_string(tid_ + kCacheUpdatePort);
   }
 };
+
+// Communication between Conflict managers
+class ConflictManagerThread {
+    Address ip_;
+    Address ip_base_;
+    unsigned tid_;
+
+public:
+    ConflictManagerThread(Address ip, unsigned tid) :
+            ip_(ip),
+            ip_base_("tcp://" + ip_ + ":"),
+            tid_(tid) {}
+
+    Address ip() const { return ip_; }
+
+    unsigned tid() const { return tid_; }
+
+    // Request key
+    Address key_request_connect_address() const {
+        return ip_base_ + std::to_string(tid_ + keyRequestPort);
+    }
+
+    Address key_request_bind_address() const {
+        return kBindBase + std::to_string(tid_ + keyRequestPort);
+    }
+
+    // Request key version
+    Address key_version_request_connect_address() const {
+        return ip_base_ + std::to_string(tid_ + keyVersionRequestPort);
+    }
+
+    Address key_version_request_bind_address() const {
+        return kBindBase + std::to_string(tid_ + keyVersionRequestPort);
+    }
+
+    // Commit begin requests from client
+    Address commit_connect_address() const {
+        return ip_base_ + std::to_string(tid_ + commitPort);
+    }
+
+    Address commit_bind_address() const {
+        return kBindBase + std::to_string(tid_ + commitPort);
+    }
+};
+
+// ConflictManagerClient threads
+class ConflictManagerClientThread {
+    Address ip_;
+    Address ip_base_;
+    unsigned tid_;
+
+public:
+    ConflictManagerClientThread() {}
+    ConflictManagerClientThread(Address ip, unsigned tid) :
+            ip_(ip),
+            tid_(tid),
+            ip_base_("tcp://" + ip_ + ":") {}
+
+    Address ip() const { return ip_; }
+
+    unsigned tid() const { return tid_; }
+
+    Address key_get_response_connect_address() const {
+        return ip_base_ + std::to_string(tid_ + clientKeyGetPort);
+    }
+
+    Address key_get_response_bind_address() const {
+        return kBindBase + std::to_string(tid_ + clientKeyGetPort);
+    }
+
+    Address key_get_version_response_connect_address() const {
+        return ip_base_ + std::to_string(tid_ + clientKeyVersionGetPort);
+    }
+
+    Address key_get_version_response_bind_address() const {
+        return kBindBase + std::to_string(tid_ + clientKeyVersionGetPort);
+    }
+
+    Address commit_response_connect_address() const {
+        return ip_base_ + std::to_string(tid_ + clientCommitPort);
+    }
+
+    Address commit_response_bind_address() const {
+        return kBindBase + std::to_string(tid_ + clientCommitPort);
+    }
+};
+
 
 class UserRoutingThread {
   Address ip_;

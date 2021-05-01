@@ -81,6 +81,9 @@ enum ConsistencyType {
   // Multi-key causal more is supported (see Anna KVS definitions for more
   // detail).
   MULTI = 2;
+
+  // Snapshot Isolation mode
+  SI = 3;
 }
 
 // A message representing an individual, serialized Python function.
@@ -288,6 +291,9 @@ message DagSchedule {
 
   // The continuation for this schedule to return to the scheduler with.
   Continuation continuation = 12;
+
+  // The snapshot to be used for the transaction
+  uint64 snapshot = 13;
 }
 
 // A trigger that enables a downstream executor to begin running a function
