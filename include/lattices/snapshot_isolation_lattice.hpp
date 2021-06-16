@@ -36,10 +36,17 @@ struct SnapshotIsolationPayload {
       value = T();
   }
 
+    SnapshotIsolationPayload<T>(uint64_t timestamp) {
+        snapshot = timestamp;
+        value = T();
+    }
+
     SnapshotIsolationPayload<T>(uint64_t timestamp, T v) {
         snapshot = timestamp;
         value = v;
     }
+
+
 
   unsigned size() {
     return sizeof(uint64_t) + value.size();
