@@ -105,7 +105,7 @@ class KvsSIClient : public KvsSIClientInterface {
     void get_async(const Key& key, const uint64_t& snapshot) {
         // we issue GET only when it is not in the pending map
         if (pending_get_response_map_.find(key) ==
-            pending_get_response_map_.end() &&
+            pending_get_response_map_.end() ||
             pending_get_response_map_[key].find(snapshot) ==
             pending_get_response_map_[key].end()) {
             KeyRequest request;
@@ -225,6 +225,7 @@ class KvsSIClient : public KvsSIClientInterface {
 
     // GC the pending get response map
     to_remove.clear();
+    map<Key, set<uint64_t>> remove_pending_reads;
     for (const auto& pair : pending_get_response_map_) {
         for (const auto& version_request : pair.second){
             if (std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -232,14 +233,17 @@ class KvsSIClient : public KvsSIClientInterface {
                         .count() > timeout_) {
                 // query to server timed out
                 result.push_back(generate_bad_response(version_request.second.request_));
-                to_remove.insert(pair.first);
-                invalidate_cache_for_worker(version_request.second.worker_addr_);
+                remove_pending_reads[pair.first].insert(version_request.first);
+                //invalidate_cache_for_worker(version_request.second.worker_addr_);
             }
         }
     }
 
-    for (const Key& key : to_remove) {
-      pending_get_response_map_.erase(key);
+    // removes pending read requests
+    for (const auto & pair : remove_pending_reads) {
+        for (const auto & snapshot : pair.second){
+            pending_get_response_map_[pair.first].erase(snapshot);
+        }
     }
 
     // GC the pending put response map
@@ -254,7 +258,7 @@ class KvsSIClient : public KvsSIClientInterface {
                 .count() > timeout_) {
           result.push_back(generate_bad_response(id_map_pair.second.request_));
           to_remove_put[key_map_pair.first].insert(id_map_pair.first);
-          invalidate_cache_for_worker(id_map_pair.second.worker_addr_);
+          //invalidate_cache_for_worker(id_map_pair.second.worker_addr_);
         }
       }
     }
